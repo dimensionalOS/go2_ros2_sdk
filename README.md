@@ -80,7 +80,7 @@ Tested systems and ROS2 distro
 ```shell
 mkdir -p ros2_ws
 cd ros2_ws
-git clone --recurse-submodules https://github.com/abizovnuralem/go2_ros2_sdk.git src
+git clone --recurse-submodules https://github.com/dimensionalOS/go2_ros2_sdk/ src
 sudo apt install ros-$ROS_DISTRO-image-tools
 sudo apt install ros-$ROS_DISTRO-vision-msgs
 
