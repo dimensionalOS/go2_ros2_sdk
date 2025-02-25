@@ -92,8 +92,8 @@ class ExplorationNode(Node):
             robot_pose = self.get_robot_pose()
             if robot_pose is not None:
                 distance = math.sqrt(
-                    (world_point[0] - robot_pose.position.x) ** 2 +
-                    (world_point[1] - robot_pose.position.y) ** 2
+                    (world_point[0] - robot_pose.x) ** 2 +
+                    (world_point[1] - robot_pose.y) ** 2
                 )
                 if distance < 0.5:  # Minimum 0.5m distance
                     return False
@@ -116,7 +116,7 @@ class ExplorationNode(Node):
                 'map',
                 'base_link',
                 rclpy.time.Time())
-            return transform.transform
+            return transform.transform.translation
         except Exception as e:
             self.get_logger().warning(f'Failed to get robot pose: {e}')
             return None
@@ -136,8 +136,8 @@ class ExplorationNode(Node):
         closest_frontier = min(
             self.frontiers,
             key=lambda f: (
-                (self.map_to_world(f)[0] - robot_pose.position.x) ** 2 +
-                (self.map_to_world(f)[1] - robot_pose.position.y) ** 2
+                (self.map_to_world(f)[0] - robot_pose.x) ** 2 +
+                (self.map_to_world(f)[1] - robot_pose.y) ** 2
             )
         )
 
