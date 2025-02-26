@@ -70,14 +70,22 @@ class ExplorationNode(Node):
         # Find frontier cells (free cells next to unknown cells)
         clusters = {}  # Store frontier clusters
         cluster_id = 0
-        min_cluster_size = 5  # Minimum points to consider a valid frontier cluster
+        min_cluster_size = 3  # Reduced minimum cluster size for more frontiers
         
-        for y in range(1, self.height - 1):
-            for x in range(1, self.width - 1):
+        # Scan with larger steps for efficiency on big maps
+        step_size = 2
+        for y in range(1, self.height - 1, step_size):
+            for x in range(1, self.width - 1, step_size):
                 if self.map_data[y, x] == free:
                     # Check if this free cell is next to an unknown cell
-                    neighbors = [(y+dy, x+dx) for dy, dx in [(0, 1), (1, 0), (0, -1), (-1, 0), (1, 1), (-1, -1), (1, -1), (-1, 1)]]
-                    unknown_count = sum(1 for ny, nx in neighbors if 0 <= ny < self.height and 0 <= nx < self.width and self.map_data[ny, nx] == unknown)
+                    neighbors = [(y+dy, x+dx) for dy, dx in [
+                        (0, step_size), (step_size, 0), (0, -step_size), (-step_size, 0),
+                        (step_size, step_size), (-step_size, -step_size),
+                        (step_size, -step_size), (-step_size, step_size)
+                    ]]
+                    unknown_count = sum(1 for ny, nx in neighbors 
+                                     if 0 <= ny < self.height and 0 <= nx < self.width 
+                                     and self.map_data[ny, nx] == unknown)
                     
                     if unknown_count > 0:
                         frontier_point = (x, y)
@@ -96,13 +104,33 @@ class ExplorationNode(Node):
                                 clusters[frontier_point] = cluster_id
                                 cluster_id += 1
 
-        # Filter clusters by size and add their centroids as frontiers
+        # Filter clusters and add their centroids as frontiers
         for cluster_points in set(clusters.values()):
             if len(cluster_points) >= min_cluster_size:
-                # Calculate cluster centroid
                 centroid_x = sum(p[0] for p in cluster_points) / len(cluster_points)
                 centroid_y = sum(p[1] for p in cluster_points) / len(cluster_points)
                 self.frontiers.append((int(centroid_x), int(centroid_y)))
+        
+        if not self.frontiers:
+            # If no frontiers found, try a more aggressive search
+            for y in range(1, self.height - 1, step_size):
+                for x in range(1, self.width - 1, step_size):
+                    if self.map_data[y, x] == free:
+                        # Look further for unknown cells
+                        search_range = 5
+                        for dy in range(-search_range, search_range + 1, step_size):
+                            for dx in range(-search_range, search_range + 1, step_size):
+                                ny, nx = y + dy, x + dx
+                                if (0 <= ny < self.height and 0 <= nx < self.width and 
+                                    self.map_data[ny, nx] == unknown):
+                                    frontier_point = (x, y)
+                                    if self.is_valid_frontier(frontier_point):
+                                        self.frontiers.append(frontier_point)
+                                        break
+                            if self.frontiers:
+                                break
+                    if self.frontiers:
+                        break
 
     def is_valid_frontier(self, point):
         """Check if a frontier point is valid and not already visited."""

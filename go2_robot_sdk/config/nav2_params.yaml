@@ -227,12 +227,12 @@ global_costmap:
       robot_base_frame: base_link
       use_sim_time: False
       resolution: 0.05
-      track_unknown_space: False
+      track_unknown_space: True
       static_map: True
-      width: 500
-      height: 500
-      origin_x: -250.0 
-      origin_y: -250.0
+      width: 1000
+      height: 1000
+      origin_x: -500.0 
+      origin_y: -500.0
       footprint: "[ [0.360, 0.200], [0.360, -0.200], [-0.450, -0.200], [-0.450, 0.200] ]"
       plugins: ["static_layer", "voxel_layer", "inflation_layer"]
 
