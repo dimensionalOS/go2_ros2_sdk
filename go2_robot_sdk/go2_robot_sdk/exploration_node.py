@@ -68,69 +68,15 @@ class ExplorationNode(Node):
         occupied = 100
         
         # Find frontier cells (free cells next to unknown cells)
-        clusters = {}  # Store frontier clusters
-        cluster_id = 0
-        min_cluster_size = 3  # Reduced minimum cluster size for more frontiers
-        
-        # Scan with larger steps for efficiency on big maps
-        step_size = 2
-        for y in range(1, self.height - 1, step_size):
-            for x in range(1, self.width - 1, step_size):
+        for y in range(1, self.height - 1):
+            for x in range(1, self.width - 1):
                 if self.map_data[y, x] == free:
                     # Check if this free cell is next to an unknown cell
-                    neighbors = [(y+dy, x+dx) for dy, dx in [
-                        (0, step_size), (step_size, 0), (0, -step_size), (-step_size, 0),
-                        (step_size, step_size), (-step_size, -step_size),
-                        (step_size, -step_size), (-step_size, step_size)
-                    ]]
-                    unknown_count = sum(1 for ny, nx in neighbors 
-                                     if 0 <= ny < self.height and 0 <= nx < self.width 
-                                     and self.map_data[ny, nx] == unknown)
-                    
-                    if unknown_count > 0:
+                    if any(self.map_data[y + dy, x + dx] == unknown
+                           for dy, dx in [(0, 1), (1, 0), (0, -1), (-1, 0)]):
                         frontier_point = (x, y)
                         if self.is_valid_frontier(frontier_point):
-                            # Check nearby points to form clusters
-                            assigned_to_cluster = False
-                            for ny, nx in neighbors:
-                                if (nx, ny) in clusters:
-                                    clusters[clusters[(nx, ny)]].append(frontier_point)
-                                    clusters[frontier_point] = clusters[(nx, ny)]
-                                    assigned_to_cluster = True
-                                    break
-                            
-                            if not assigned_to_cluster:
-                                clusters[cluster_id] = [frontier_point]
-                                clusters[frontier_point] = cluster_id
-                                cluster_id += 1
-
-        # Filter clusters and add their centroids as frontiers
-        for cluster_points in set(clusters.values()):
-            if len(cluster_points) >= min_cluster_size:
-                centroid_x = sum(p[0] for p in cluster_points) / len(cluster_points)
-                centroid_y = sum(p[1] for p in cluster_points) / len(cluster_points)
-                self.frontiers.append((int(centroid_x), int(centroid_y)))
-        
-        if not self.frontiers:
-            # If no frontiers found, try a more aggressive search
-            for y in range(1, self.height - 1, step_size):
-                for x in range(1, self.width - 1, step_size):
-                    if self.map_data[y, x] == free:
-                        # Look further for unknown cells
-                        search_range = 5
-                        for dy in range(-search_range, search_range + 1, step_size):
-                            for dx in range(-search_range, search_range + 1, step_size):
-                                ny, nx = y + dy, x + dx
-                                if (0 <= ny < self.height and 0 <= nx < self.width and 
-                                    self.map_data[ny, nx] == unknown):
-                                    frontier_point = (x, y)
-                                    if self.is_valid_frontier(frontier_point):
-                                        self.frontiers.append(frontier_point)
-                                        break
-                            if self.frontiers:
-                                break
-                    if self.frontiers:
-                        break
+                            self.frontiers.append(frontier_point)
 
     def is_valid_frontier(self, point):
         """Check if a frontier point is valid and not already visited."""
@@ -149,7 +95,7 @@ class ExplorationNode(Node):
                     (world_point[0] - robot_pose.x) ** 2 +
                     (world_point[1] - robot_pose.y) ** 2
                 )
-                if distance < 1.0:  # Increased minimum distance to 1.0m
+                if distance < 1.0:  # Minimum 0.5m distance
                     return False
         except Exception as e:
             self.get_logger().warning(f'Could not get robot pose: {e}')
@@ -181,41 +127,25 @@ class ExplorationNode(Node):
             self.get_logger().info('No more frontiers to explore!')
             return
 
-        # Sort frontiers by a weighted combination of distance and information gain
+        # Sort frontiers by distance to current position
         robot_pose = self.get_robot_pose()
         if robot_pose is None:
             return
 
-        # Find best frontier using weighted distance and unexplored area
-        def frontier_score(frontier):
-            world_point = self.map_to_world(frontier)
-            distance = math.sqrt(
-                (world_point[0] - robot_pose.x) ** 2 +
-                (world_point[1] - robot_pose.y) ** 2
+        # Find closest frontier
+        closest_frontier = min(
+            self.frontiers,
+            key=lambda f: (
+                (self.map_to_world(f)[0] - robot_pose.x) ** 2 +
+                (self.map_to_world(f)[1] - robot_pose.y) ** 2
             )
-            # Count unknown cells in frontier neighborhood
-            x, y = frontier
-            unknown_count = 0
-            for dy in range(-5, 6):
-                for dx in range(-5, 6):
-                    ny, nx = y + dy, x + dx
-                    if (0 <= ny < self.height and 0 <= nx < self.width and 
-                        self.map_data[ny, nx] == -1):
-                        unknown_count += 1
-            
-            # Weight distance vs exploration potential
-            distance_weight = 0.3  # Lower weight means distance is less important
-            exploration_weight = 0.7  # Higher weight favors areas with more unknown cells
-            
-            return -(distance_weight * distance - exploration_weight * unknown_count)
-
-        best_frontier = max(self.frontiers, key=frontier_score)
+        )
 
         # Convert frontier point to PoseStamped
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'map'
         goal_pose.header.stamp = self.get_clock().now().to_msg()
-        world_point = self.map_to_world(best_frontier)
+        world_point = self.map_to_world(closest_frontier)
         goal_pose.pose.position.x = world_point[0]
         goal_pose.pose.position.y = world_point[1]
         goal_pose.pose.orientation.w = 1.0
