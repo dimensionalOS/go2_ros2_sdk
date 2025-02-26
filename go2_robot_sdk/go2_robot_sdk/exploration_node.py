@@ -121,7 +121,7 @@ class ExplorationNode(Node):
                     (world_point[0] - robot_pose.x) ** 2 +
                     (world_point[1] - robot_pose.y) ** 2
                 )
-                if distance < 3.0:  # Increased minimum distance to 1.0m
+                if distance < 1.0:  # Increased minimum distance to 1.0m
                     return False
         except Exception as e:
             self.get_logger().warning(f'Could not get robot pose: {e}')
