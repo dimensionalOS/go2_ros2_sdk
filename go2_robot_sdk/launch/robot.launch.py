@@ -179,7 +179,28 @@ def generate_launch_description():
         Node(
             package='go2_robot_sdk',
             executable='go2_driver_node',
-            parameters=[{'robot_ip': robot_ip, 'token': robot_token, "conn_type": conn_type}],
+            parameters=[{'robot_ip': robot_ip, 'token': robot_token, "conn_type": conn_type},
+            {
+                "qos_overrides": {
+                    "/camera/image_raw": {
+                        "publisher": {
+                            "reliability": "reliable",
+                            "history": "keep_last",
+                            "depth": 1,
+                        }
+                    }
+                }
+            }],
+        ),
+        Node(
+            package='image_transport',
+            executable='republish',
+            name='image_republisher',
+            arguments=['raw', 'compressed'],
+            remappings=[
+                ('in', 'camera/image_raw'),
+                ('out/compressed', 'camera/compressed'),
+            ],
         ),
         Node(
             package='go2_robot_sdk',
