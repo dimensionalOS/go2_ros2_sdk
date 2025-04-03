@@ -67,3 +67,14 @@ def gen_mov_command(x: float, y: float, z: float) -> str:
         topic=SPORT_MODE_TOPIC
     )
     return json.dumps(command)
+
+
+def gen_pose_command(roll: float, pitch: float, yaw: float):
+
+    parameters = {"x": roll, "y": pitch, "z": yaw}
+    command = create_command_structure(
+        api_id=1007,
+        parameter=parameters,
+        topic=SPORT_MODE_TOPIC
+    )
+    return json.dumps(command)
