@@ -33,7 +33,7 @@ from cv_bridge import CvBridge
 
 
 from scripts.go2_constants import ROBOT_CMD, RTC_TOPIC
-from scripts.go2_func import gen_command, gen_mov_command
+from scripts.go2_func import gen_command, gen_mov_command, gen_pose_command
 from scripts.go2_lidar_decoder import update_meshes_for_cloud2
 from scripts.go2_math import get_robot_joints
 from scripts.go2_camerainfo import load_camera_info
@@ -45,7 +45,7 @@ from rclpy.qos import QoSProfile, QoSHistoryPolicy, QoSReliabilityPolicy
 from rclpy.qos_overriding_options import QoSOverridingOptions
 
 from tf2_ros import TransformBroadcaster
-from geometry_msgs.msg import Twist, TransformStamped, PoseStamped
+from geometry_msgs.msg import Twist, TransformStamped, PoseStamped, Vector3
 from go2_interfaces.msg import Go2State, IMU
 from unitree_go.msg import LowState, VoxelMapCompressed, WebRtcReq
 from sensor_msgs.msg import PointCloud2, PointField, JointState, Joy
@@ -184,6 +184,7 @@ class RobotBaseNode(Node):
         self.camera_info = load_camera_info()
 
         self.robot_cmd_vel = {}
+        self.robot_pose_cmd = {}  # Add this line to store pose commands
         self.robot_odom = {}
         self.robot_low_cmd = {}
         self.robot_sport_state = {}
@@ -203,6 +204,11 @@ class RobotBaseNode(Node):
                 'webrtc_req',
                 lambda msg: self.webrtc_req_cb(msg, "0"),
                 qos_profile)
+            self.create_subscription(
+                Vector3,
+                'pose_cmd',
+                lambda msg: self.pose_cmd_cb(msg, "0"),
+                qos_profile)
         else:
             for i in range(len(self.robot_ip_lst)):
                 self.create_subscription(
@@ -214,6 +220,11 @@ class RobotBaseNode(Node):
                     WebRtcReq,
                     f'robot{str(i)}/webrtc_req',
                     lambda msg: self.webrtc_req_cb(msg, str(i)),
+                    qos_profile)
+                self.create_subscription(
+                    Vector3,
+                    f'robot{str(i)}/pose_cmd',
+                    lambda msg, i=i: self.pose_cmd_cb(msg, str(i)),
                     qos_profile)
 
         self.create_subscription(
@@ -270,6 +281,16 @@ class RobotBaseNode(Node):
             self.robot_cmd_vel[robot_num] = gen_mov_command(
                 round(x, 2), round(y, 2), round(z, 2))
 
+    def pose_cmd_cb(self, msg, robot_num):
+        roll = msg.x
+        pitch = msg.y
+        yaw = msg.z
+
+        # Allow pose changes when any of the values are non-zero
+        if roll != 0.0 or pitch != 0.0 or yaw != 0.0:
+            self.robot_pose_cmd[robot_num] = gen_pose_command(
+                round(roll, 2), round(pitch, 2), round(yaw, 2))
+
     def webrtc_req_cb(self, msg, robot_num):
         payload = gen_command(msg.api_id, msg.parameter, msg.topic)
         self.webrtc_msgs.put_nowait(payload)
@@ -320,6 +341,14 @@ class RobotBaseNode(Node):
             self.conn[robot_num].data_channel.send(
                 self.robot_cmd_vel[robot_num])
             self.robot_cmd_vel[robot_num] = None
+        
+        # Add this block to handle pose commands
+        if robot_num in self.conn and robot_num in self.robot_pose_cmd and self.robot_pose_cmd[
+                robot_num] is not None:
+            self.get_logger().info("Change pose")
+            self.conn[robot_num].data_channel.send(
+                self.robot_pose_cmd[robot_num])
+            self.robot_pose_cmd[robot_num] = None
 
         if robot_num in self.conn and self.joy_state.buttons and self.joy_state.buttons[1]:
             self.get_logger().info("Stand down")
