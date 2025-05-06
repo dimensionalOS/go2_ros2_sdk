@@ -48,6 +48,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
+# Initialize decoder
 decoder = LidarDecoder()
 
 
@@ -206,6 +207,11 @@ class Go2Connection():
         self.on_open = on_open
         self.on_video_frame = on_video_frame
         self.decode_lidar = decode_lidar
+        
+        # Initialize decoder if it doesn't exist
+        global decoder
+        if 'decoder' not in globals():
+            decoder = LidarDecoder()
 
         self.data_channel = self.pc.createDataChannel("data", id=0)
         self.data_channel.on("open", self.on_data_channel_open)
@@ -259,7 +265,10 @@ class Go2Connection():
                 if msgobj.get("type") == "validation":
                     self.validate_robot_conn(msgobj)
             elif isinstance(msg, bytes):
-                msgobj = Go2Connection.deal_array_buffer(msg, perform_decode=self.decode_lidar)
+                msgobj = Go2Connection.deal_array_buffer(
+                    msg, 
+                    perform_decode=self.decode_lidar,
+                )
 
             if self.on_message:
                 self.on_message(msg, msgobj, self.robot_num)
@@ -395,17 +404,23 @@ class Go2Connection():
 
     @staticmethod
     def deal_array_buffer(buffer, perform_decode=True):
-
         if isinstance(buffer, bytes):
             length = struct.unpack("H", buffer[:2])[0]
             json_segment = buffer[4: 4 + length]
             compressed_data = buffer[4 + length:]
             json_str = json_segment.decode("utf-8")
             obj = json.loads(json_str)
+            
+            # Always store the compressed data
+            obj["compressed_data"] = compressed_data
+            
             if perform_decode:
+                # Get the decoded data
                 decoded_data = decoder.decode(compressed_data, obj['data'])
-                obj["decoded_data"] = decoded_data
-            else:
-                obj["compressed_data"] = compressed_data
+                
+                # Place all decoded fields at the top level for easier access
+                for key, value in decoded_data.items():
+                    obj[key] = value
+                
             return obj
         return None

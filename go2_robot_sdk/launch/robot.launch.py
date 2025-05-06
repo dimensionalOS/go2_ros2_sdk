@@ -135,7 +135,7 @@ def generate_launch_description():
                 ],
                 parameters=[{
                     'target_frame': 'base_link',
-                    'max_height': 0.5
+                    'max_height': 0.3
                 }],
                 output='screen',
             ),

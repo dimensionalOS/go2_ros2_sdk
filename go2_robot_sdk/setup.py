@@ -48,7 +48,10 @@ setup(
         
         
     ],
-    install_requires=['setuptools'],
+    install_requires=[
+        'setuptools',
+        'lz4',
+    ],
     zip_safe=True,
     maintainer='brimo',
     maintainer_email='abizov94@gmail.com',
@@ -58,7 +61,8 @@ setup(
     entry_points={
         'console_scripts': [
             'go2_driver_node = go2_robot_sdk.go2_driver_node:main',
-            'lidar_to_pointcloud = go2_robot_sdk.lidar_to_point:main'
+            'lidar_to_pointcloud = go2_robot_sdk.lidar_to_point:main',
+            'costmap_clearer = go2_robot_sdk.costmap_clearer:main'
         ],
     },
 )

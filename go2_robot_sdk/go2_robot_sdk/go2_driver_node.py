@@ -27,6 +27,7 @@ import logging
 import os
 import threading
 import asyncio
+import numpy as np
 
 from aiortc import MediaStreamTrack
 from cv_bridge import CvBridge
@@ -34,7 +35,6 @@ from cv_bridge import CvBridge
 
 from scripts.go2_constants import ROBOT_CMD, RTC_TOPIC
 from scripts.go2_func import gen_command, gen_mov_command, gen_pose_command
-from scripts.go2_lidar_decoder import update_meshes_for_cloud2
 from scripts.go2_math import get_robot_joints
 from scripts.go2_camerainfo import load_camera_info
 from scripts.webrtc_driver import Go2Connection
@@ -254,7 +254,7 @@ class RobotBaseNode(Node):
                 qos_profile)
 
         self.timer = self.create_timer(0.1, self.timer_callback)
-        self.timer_lidar = self.create_timer(0.5, self.timer_callback_lidar)
+        self.timer_lidar = self.create_timer(0.1, self.timer_callback_lidar)
 
     def timer_callback(self):
         if self.conn_type == 'webrtc':
@@ -472,29 +472,33 @@ class RobotBaseNode(Node):
     def publish_lidar_webrtc(self):
         for i in range(len(self.robot_lidar)):
             if self.robot_lidar[str(i)]:
-                points = update_meshes_for_cloud2(
-                    self.robot_lidar[str(i)]["decoded_data"]["positions"],
-                    self.robot_lidar[str(i)]["decoded_data"]["uvs"],
-                    self.robot_lidar[str(i)]['data']['resolution'],
-                    self.robot_lidar[str(i)]['data']['origin'],
-                    0
-                )
-                point_cloud = PointCloud2()
-                point_cloud.header = Header(frame_id="odom")
-                point_cloud.header.stamp = self.get_clock().now().to_msg()
-                fields = [
-                    PointField(name='x', offset=0,
-                               datatype=PointField.FLOAT32, count=1),
-                    PointField(name='y', offset=4,
-                               datatype=PointField.FLOAT32, count=1),
-                    PointField(name='z', offset=8,
-                               datatype=PointField.FLOAT32, count=1),
-                    PointField(name='intensity', offset=12,
-                               datatype=PointField.FLOAT32, count=1),
-                ]
-                point_cloud = point_cloud2.create_cloud(
-                    point_cloud.header, fields, points)
-                self.go2_lidar_pub[i].publish(point_cloud)
+                try:
+                    # Points should be directly accessible in the decoded data
+                    if "points" in self.robot_lidar[str(i)]:
+                        points = self.robot_lidar[str(i)]["points"]
+                    else:
+                        self.get_logger().error("No point data available")
+                        continue
+                    
+                    point_cloud = PointCloud2()
+                    point_cloud.header = Header(frame_id="odom")
+                    point_cloud.header.stamp = self.get_clock().now().to_msg()
+                    fields = [
+                        PointField(name='x', offset=0,
+                                datatype=PointField.FLOAT32, count=1),
+                        PointField(name='y', offset=4,
+                                datatype=PointField.FLOAT32, count=1),
+                        PointField(name='z', offset=8,
+                                datatype=PointField.FLOAT32, count=1),
+                        PointField(name='intensity', offset=12,
+                                datatype=PointField.FLOAT32, count=1),
+                    ]
+                    point_cloud = point_cloud2.create_cloud(
+                        point_cloud.header, fields, points)
+                    self.go2_lidar_pub[i].publish(point_cloud)
+                
+                except Exception as e:
+                    self.get_logger().error(f"Error in lidar processing: {e}")
 
     def publish_voxel_webrtc(self):
         for i in range(len(self.robot_lidar)):

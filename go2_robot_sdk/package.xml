@@ -11,6 +11,8 @@
   <depend>go2_interfaces</depend>
   <depend>unitree_go</depend>
   <depend>sensor_msgs</depend>
+  <depend>python3-lz4</depend>
+  <depend>nav2_msgs</depend>
 
   <exec_depend>twist_mux</exec_depend>
   <exec_depend>joy</exec_depend>
